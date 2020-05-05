@@ -1,6 +1,7 @@
 ---
 title: 从零搭建react app
 date: 2020-04-16 15:01:03
+update: 2020-05-05 23:51:38
 tags:
 - react
 categories:
@@ -286,7 +287,52 @@ export default connect(mapStateToProps, {
 
 ## 项目优化
 ### 编写 httpMiddleWare 进一步封装异步action
+仅适用redux-thunk编写的action还无法满足我们的要求，比如他没有基于promise封装，不能单独拿来接收返回值等。因此我们需要编写一个我们自己的中间件来处理这些事。
+```javascript
+// 改写后的期望的action范式
+// reducers/login.js
+export const login = data => ({
+  type: 'LOGIN',
+  promise: client => client.post('api/xxx', { data }),
+  args: data
+})
+// login.jsx
+import { login } from 'reducer/login'
+{...
+  const handleLogin = async () => {
+    const resp = await this.props.login(data) // 可以接收到异步action的值
+  }
+...}
+```
+编写 httpMiddleWare.js 中间件,通讯模块基于axios
+```javascript
+// utils/httpMiddleWare.js
+  import $axios from 'axios'
+  const httpMiddleWare = ({ dispatch, getState }) => {
+    return next => action => {
+      if (!action) return Promise.resolve()
+      const { promise, type, args } = action
+      // promise参数传入的是一个 function 
+      // promise: client => client.post('api/xxx')
+      if (typeof promise !== 'function') return next(action)
+      return promise($axios).then(({ data }) => { // promise是函数则把$axios实例传进去构成promise查询
+        dispatch({ type, data, arg }) // 接口返回的data对应action.data, 然后触发redux的dispatch(action)
+        return Promise.resolve(data) // resolve结果并返回，外界可以直接拿到返回值
+      }).catch(err => {
+        return Promise.reject(data) // 错误reject
+      }) 
+    }
+  }
+  export default httpMiddleWare
+// store.js
+...
+import httpMiddleWare from 'utils/httpMiddleWare'
+const middleWares = [thunk, httpMiddleWare]
 
+const store = createStore(rootReducers, 
+  applyMiddleWare(...middleWares) // 应用httpMiddleWare中间件
+)
+```
 ### react-router 懒加载模块
 [react-router 4.x路由懒加载方案](https://blog.whezh.com/react-redux-code-splitting/)
 react-router 懒加载在 4.x 以前只需要运用 `router.getComponent()` 方法范式即可，该范式可以在访问到当前路由时才加载路由文件。

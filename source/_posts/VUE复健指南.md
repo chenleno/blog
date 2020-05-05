@@ -188,6 +188,7 @@ Tips:
 - 向组件中传递不带`v-slot`的指令的子节点时，这些子节点被存储在组件实例的`$slots.default`中
 VUE通过`createElement()`方法建立一个vNode
 ## 响应式原理
+基于 `Object.defineProperty()` 的发布订阅模式
 ```javascript
 /**
  * VUE响应式原理
@@ -214,11 +215,11 @@ class Dep {
     this.subscribers.forEach(sub => sub())
   }
 }
+let dep = new Dep()
 
 Object.keys(data).forEach(i => {
-  let dep = new Dep()
   let currentValue = data[i] // 
-  Object.defineProperty(data, i, { 
+  Object.defineProperty(data, i, { // VUE中将 data 代理到了 VUE的实例vm
     get: function() {
       dep.depend()
       return currentValue
@@ -263,7 +264,6 @@ watcher(() => {
   }
 }
 ```
-
 ## 操作实例
 ```javascript
 <div id="app">
@@ -271,7 +271,7 @@ watcher(() => {
   <p>Computed reversed message: "{{ reversedMessage }}"</p>
   <p v-for="(item, index) in messageArr" key="index">{{ item.message }}</p>
   <button v-on:click="sayHello('hello', $event)">点击</button>
-  <slot name="submit">submit</slot> // 没有提供插槽内容时将会默认使用该内容xs
+  <slot name="submit">submit</slot> // 没有提供插槽内容时将会默认使用该内容
 </div>
 
 new VUE({

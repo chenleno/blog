@@ -1,6 +1,6 @@
 ---
 title: QA归档.md
-updated: 2020-04-22 11:31:24
+updated: 2020-04-24 11:05:23
 date: 2020-04-08 11:19:02
 tags:
 - QA
@@ -284,3 +284,84 @@ function updateChildren(vnode, newVnode) {
 }
 ```
 ## 理解MVVM
+以VUE为例
+```javascript
+View ==== ViewModel ==== Model
+ ||           ||          ||
+DOM           VUE      plain object
+```
+View 通过事件绑定操作 Model
+Model 通过数据绑定操作 View
+三要素： 响应式，模板引擎，渲染
+### 渲染render
+render 返回vnode
+```javascript
+function render() {
+  with(this) {
+    return _c(...) // _c()同h(),返回的是vnode
+  }
+}
+```
+### updateComponent 
+set 中 执行updateComponent, 这一步是异步的
+updateComponent中执行 patch
+页面首次渲染时执行`updateComponent(container, vnode)`
+页面有更新时执行`updateComopnent(vnode, newVnode)`
+### VUE实现流程
+1. 解析模板成render函数
+2. 响应式开始监听(被访问到的变量)
+3. 首次渲染，显示页面，绑定依赖
+4. data中被监听的属性变化，触发rerender
+#### 和 react 对比
+1. 初次渲染 `ReactDOM.render(<App/>, container)`
+2. 会触发`patch(container, vnode)`
+3. setState rerender的时候
+4. 会触发`patch(vnode, newVnode)`
+#### setState的异步
+```javascript
+setState({ list: data }, () => {
+  this.renderComponent()  // renderComponent 继承自 React.Component
+})
+// Component
+class Component {
+  renderComponent() {
+    const prevVnode = this._vnode
+    const newVnode = this.render()
+    patch(prevVnode, newVnode)
+    this._vnode = newVnode
+  }
+}
+
+```
+
+```javascript
+React.createElement(List, {data: this.state.list})
+var list = new List({ data: this.state.list })
+var vnode = list.render()
+```
+
+## 前端路由原理
+- hash (hashchange函数)
+- history (pushState, replaceState这两个方法改变url的path部分不会引起刷新)
+  + popState 只有在浏览器前进后退时才会使用
+## 浏览器缓存策略
+> 浏览器每次发起请求，都会先在浏览器缓存中查询结果和缓存表示
+> 浏览器每次拿到返回的请求结果都会将该结果和标识存入浏览器缓存中
+### 强制缓存
+缓存格式由response响应报头中的`cache-control`和`expires`控制
+cache-control 的值：
+- public: 所有内容都可被缓存（包括客户端和代理服务器）
+- private: 只有客户端可以缓存（默认值）
+- no-cache: 客户端缓存内容，但是否使用由协商缓存结果决定
+- no-store: 所有内容都不会被缓存
+- max-age=xxx: 缓存内容在xxx s后失效（是一个相对值）
+expires 是一个绝对值
+
+- memory-cache：存在内存中，读取快无需编译，关闭浏览器就会清空
+- disk-cache：存在硬盘中，读取慢需要编译
+浏览器会将js和图片等文件解析后存在内存中，css文件则会存在硬盘中
+### 协商缓存
+强制缓存失效后，浏览器带着缓存标识请求服务器，服务器检查标识，若资源未改变，则返回304 not modified,浏览器继续使用该缓存。如果变化了，则返回200，浏览器使用返回的新资源
+
+总结：
+> 强制缓存优先于协商缓存进行，若强制缓存(Expires和Cache-Control)生效则直接使用缓存，若不生效则进行协商缓存(Last-Modified / If-Modified-Since和Etag / If-None-Match)，协商缓存由服务器决定是否使用缓存，若协商缓存失效，那么代表该请求的缓存失效，重新获取请求结果，再存入浏览器缓存中；生效则返回304，继续使用缓存
